@@ -79,6 +79,7 @@ from app.services.skill_extractor import extract_skills
 from app.services.authenticity_engine import compute_skill_authenticity
 from app.services.ai_verifier import analyze_skill_authenticity
 from app.services.evidence_graph import build_skill_graph
+from concurrent.futures import ThreadPoolExecutor
 
 router = APIRouter()
 
@@ -91,13 +92,22 @@ def verify_student(student: dict):
 
     repos = fetch_repositories(username)
 
+    # repo_analysis = []
+
+    # for repo in repos:
+
+    #     analysis = analyze_repository(username, repo)
+
+    #     repo_analysis.append(analysis)  
     repo_analysis = []
 
-    for repo in repos:
+    with ThreadPoolExecutor(max_workers=10) as executor:
+       results = executor.map(
+         lambda repo: analyze_repository(username, repo),
+         repos
+         )
 
-        analysis = analyze_repository(username, repo)
-
-        repo_analysis.append(analysis)
+    repo_analysis = list(results)
 
     skill_map = extract_skills(repo_analysis)
 
