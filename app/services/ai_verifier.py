@@ -79,9 +79,9 @@ Respond strictly in JSON format:
 
 {{
  "skills": {{
-   "React": score,
-   "Machine Learning": score,
-   "Backend": score
+   "React": score(0-10),
+   "Machine Learning": score(0-10),
+   "Backend": score(0-10)
  }},
  "analysis": "short explanation"
 }}
