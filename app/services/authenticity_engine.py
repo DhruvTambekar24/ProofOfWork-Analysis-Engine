@@ -14,27 +14,11 @@
 
 #     return authenticity_scores
 def compute_skill_authenticity(skill_map):
-
     scores = {}
-
-    for skill, repos in skill_map.items():
-
-        if not repos:
+    for skill, repo_scores in skill_map.items():
+        if not repo_scores:
             scores[skill] = 0
             continue
-
-        total = 0
-
-        for repo in repos:
-
-            # ensure repo has score
-            score = repo.get("score", 0)
-
-            total += score
-
-        avg = total / len(repos)
-
-        # normalize score out of 10
+        avg = sum(repo_scores) / len(repo_scores)  # ✅ already floats
         scores[skill] = round(min(avg * 10, 10), 2)
-
     return scores
