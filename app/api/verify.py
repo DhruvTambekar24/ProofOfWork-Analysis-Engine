@@ -70,29 +70,25 @@ from app.services.evidence_graph import build_skill_graph
 router = APIRouter()
 
 
-def normalize_scores(base_scores: dict):
-
+def normalize_scores(scores: dict):
+    """
+    Ensure skill scores are always between 0 and 10
+    """
     normalized = {}
 
-    for skill, score in base_scores.items():
-
-        # ensure score is always between 0 and 10
+    for skill, score in scores.items():
         normalized[skill] = round(min(score, 10), 2)
 
     return normalized
 
 
-def sanitize_repo_output(repos):
-
+def clean_repo_output(repos):
     """
-    Remove heavy fields from repo output
-    to keep API response clean.
+    Remove heavy fields like README from API output
     """
-
     cleaned = []
 
     for r in repos:
-
         cleaned.append({
             "repo": r.get("repo"),
             "language": r.get("language"),
@@ -105,81 +101,105 @@ def sanitize_repo_output(repos):
 
     return cleaned
 
-@router.post("/detailed-analysis")
-def detailed_repo_analysis(student: dict):
 
-    username = student["github_username"]
-
-    repos = fetch_repositories(username)
-
-    with ThreadPoolExecutor(max_workers=10) as executor:
-
-        results = executor.map(
-            lambda repo: analyze_repository(username, repo),
-            repos
-        )
-
-    repo_analysis = list(results)
-
-    return {
-        "repositories": repo_analysis
-    }
 @router.post("/verify")
 def verify_student(student: dict):
 
-    username = student["github_username"]
-    name = student["name"]
+    try:
 
-    repos = fetch_repositories(username)
+        username = student.get("github_username")
+        name = student.get("name", username)
 
-    # ---- PARALLEL REPO ANALYSIS ----
-    with ThreadPoolExecutor(max_workers=10) as executor:
+        if not username:
+            return {"error": "github_username is required"}
 
-        results = executor.map(
-            lambda repo: analyze_repository(username, repo),
-            repos
+        # -----------------------------
+        # Fetch GitHub repositories
+        # -----------------------------
+
+        repos = fetch_repositories(username)
+
+        if not repos:
+            return {
+                "student": name,
+                "repos_analyzed": 0,
+                "base_scores": {},
+                "ai_verification": "No repositories found.",
+                "skills_detected": []
+            }
+
+        # -----------------------------
+        # Analyze repos in parallel
+        # -----------------------------
+
+        with ThreadPoolExecutor(max_workers=10) as executor:
+
+            results = executor.map(
+                lambda repo: analyze_repository(username, repo),
+                repos
+            )
+
+        repo_analysis = list(results)
+
+        # -----------------------------
+        # Extract skills
+        # -----------------------------
+
+        skill_map = extract_skills(repo_analysis)
+
+        # -----------------------------
+        # Compute authenticity scores
+        # -----------------------------
+
+        base_scores = compute_skill_authenticity(skill_map)
+
+        base_scores = normalize_scores(base_scores)
+
+        # -----------------------------
+        # Build skill evidence graph
+        # -----------------------------
+
+        skill_graph = build_skill_graph(skill_map)
+
+        # -----------------------------
+        # AI verification
+        # -----------------------------
+
+        ai_result = analyze_skill_authenticity(
+            name,
+            repo_analysis,
+            skill_map
         )
 
-    repo_analysis = list(results)
+        if isinstance(ai_result, dict):
+            ai_text = ai_result.get("analysis", "")
+        else:
+            ai_text = str(ai_result)
 
-    # ---- SKILL EXTRACTION ----
-    skill_map = extract_skills(repo_analysis)
+        # -----------------------------
+        # Clean repo output
+        # -----------------------------
 
-    # ---- BASE AUTHENTICITY SCORES ----
-    base_scores = compute_skill_authenticity(skill_map)
+        cleaned_repos = clean_repo_output(repo_analysis)
 
-    # ---- NORMALIZE SCORES (0-10) ----
-    base_scores = normalize_scores(base_scores)
+        return {
+            "student": name,
+            "repos_analyzed": len(repo_analysis),
 
-    # ---- SKILL GRAPH (internal) ----
-    skill_graph = build_skill_graph(skill_map)
+            "base_scores": base_scores,
 
-    # ---- AI VERIFICATION ----
-    ai_result = analyze_skill_authenticity(
-        name,
-        repo_analysis,
-        skill_map
-    )
+            "ai_verification": ai_text,
 
-    # ---- CLEAN AI OUTPUT ----
-    ai_analysis = ai_result.get("analysis", "")
-    ai_scores = ai_result.get("skills", {})
+            "skills_detected": list(skill_map.keys()),
 
-    # ---- CLEAN REPO OUTPUT ----
-    cleaned_repos = sanitize_repo_output(repo_analysis)
+            # optional repo summary
+            "repositories": cleaned_repos
+        }
 
-    return {
-        "student": name,
-        "repos_analyzed": len(repo_analysis),
+    except Exception as e:
 
-        "base_scores": base_scores,
-
-        "ai_scores": ai_scores,
-
-        "analysis": ai_analysis,
-
-        "skills_detected": list(skill_map.keys()),
-
-        # show minimal repo info only
-        "repositories": cleaned_repos
-    }
+        # Prevent frontend crashes
+        return {
+            "error": "verification_failed",
+            "message": str(e)
+        }
