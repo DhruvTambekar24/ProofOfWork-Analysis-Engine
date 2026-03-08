@@ -22,9 +22,10 @@ def compute_skill_authenticity(skill_map):
         total = 0
 
         for repo in repos:
-            total += repo["score"]
+            total += repo["score"]   # ✔ correct
 
-        # average score
-        scores[skill] = (total / len(repos)) * 10
+        avg = total / len(repos)
+
+        scores[skill] = round(avg * 10, 2)
 
     return scores
