@@ -50,7 +50,18 @@ from groq import Groq
 from app.config.settings import GROQ_API_KEY
 
 client = Groq(api_key=GROQ_API_KEY)
+import json
+import re
 
+
+def clean_ai_output(text):
+
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+
+    if match:
+        return json.loads(match.group())
+
+    return {"analysis": text}
 
 def analyze_skill_authenticity(student_name, repo_analysis, skill_map):
 
@@ -94,5 +105,6 @@ Respond strictly in JSON format:
         ],
         temperature=0.2
     )
+    content = response.choices[0].message.content
 
-    return response.choices[0].message.content
+    return clean_ai_output(content)
