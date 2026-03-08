@@ -38,7 +38,6 @@ from app.services.fraud_detector import detect_tutorial_repo
 from app.services.plagiarism_detector import extract_code, ai_code_similarity
 
 
-# Fetch README for project understanding
 def get_readme(owner, repo):
 
     url = f"https://raw.githubusercontent.com/{owner}/{repo}/main/README.md"
@@ -51,7 +50,7 @@ def get_readme(owner, repo):
 
         return ""
 
-    except:
+    except Exception:
         return ""
 
 
@@ -60,29 +59,50 @@ def analyze_repository(username, repo):
     owner = repo["owner"]
     repo_name = repo["name"]
 
+    # --------------------------
     # Fetch commits
+    # --------------------------
+
     commits = fetch_commits(owner, repo_name)
 
-    # Calculate commit ownership
+    # --------------------------
+    # Commit ownership
+    # --------------------------
+
     ownership = calculate_commit_ownership(commits, username)
 
-    # Commit-based complexity estimate
+    # --------------------------
+    # Complexity estimation
+    # --------------------------
+
     commit_count = len(commits)
     complexity_score = min(commit_count / 50, 1)
 
+    # --------------------------
     # Project structure depth
+    # --------------------------
+
     structure_score = analyze_structure(owner, repo_name)
 
-    # Detect tutorial projects
+    # --------------------------
+    # Tutorial detection
+    # --------------------------
+
     tutorial_flag = detect_tutorial_repo(repo_name)
 
-    # Fetch README
+    # --------------------------
+    # README extraction
+    # --------------------------
+
     readme = get_readme(owner, repo_name)
 
-    # Extract code snippets for plagiarism detection
+    # --------------------------
+    # Code plagiarism detection
+    # --------------------------
+
     code_samples = extract_code(owner, repo_name)
 
-    plagiarism_report = {}
+    plagiarism_report = {"risk_level": "UNKNOWN"}
 
     if code_samples:
         try:
@@ -90,10 +110,13 @@ def analyze_repository(username, repo):
                 repo_name,
                 code_samples[:3]
             )
-        except:
+        except Exception:
             plagiarism_report = {"risk_level": "UNKNOWN"}
 
-    # Compute repository authenticity score
+    # --------------------------
+    # Repository authenticity score
+    # --------------------------
+
     repo_score = (
         0.4 * ownership +
         0.3 * complexity_score +
