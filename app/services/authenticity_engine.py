@@ -17,14 +17,14 @@ def compute_skill_authenticity(skill_map):
 
     scores = {}
 
-    for skill, evidence in skill_map.items():
+    for skill, repos in skill_map.items():
 
-        avg_score = sum(evidence) / len(evidence)
+        total = 0
 
-        evidence_bonus = min(len(evidence) * 0.5, 2)
+        for repo in repos:
+            total += repo["score"]
 
-        final_score = (avg_score * 10) + evidence_bonus
-
-        scores[skill] = round(final_score, 2)
+        # average score
+        scores[skill] = (total / len(repos)) * 10
 
     return scores
